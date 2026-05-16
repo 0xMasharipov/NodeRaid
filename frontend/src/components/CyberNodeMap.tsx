@@ -178,14 +178,35 @@ export default function CyberNodeMap() {
     subnetLayer.addChild(subnetFill, subnetGfx);
 
     let lastSubnetState = '';
-    
+
     function updateSubnets(mapData: import('../store/gameStore').NodeData[]) {
+      const currentPlayer = useGameStore.getState().currentPlayer?.toLowerCase() ?? null;
+
+      // Mainframe (buildingType 4) sahibi varsa onu kullan, yoksa dominant owner
       const owners = new Array(8).fill(null);
       for (const node of mapData) {
-        if (node.buildingType === 4 && node.owner) { // Mainframe found
+        if (node.buildingType === 4 && node.owner) {
           const subnetId = Math.floor(node.id / 128);
-          owners[subnetId] = node.owner;
+          owners[subnetId] = node.owner.toLowerCase();
         }
+      }
+
+      // Mainframe olmayan subnet'ler için dominant owner hesapla
+      for (let i = 0; i < 8; i++) {
+        if (owners[i]) continue;
+        const counts: Record<string, number> = {};
+        for (const node of mapData) {
+          if (node.owner && Math.floor(node.id / 128) === i) {
+            const addr = node.owner.toLowerCase();
+            counts[addr] = (counts[addr] || 0) + 1;
+          }
+        }
+        let max = 0;
+        let dominant: string | null = null;
+        for (const [addr, count] of Object.entries(counts)) {
+          if (count > max) { max = count; dominant = addr; }
+        }
+        if (max >= 3) owners[i] = dominant;
       }
 
       const stateStr = owners.join(',');
@@ -204,7 +225,7 @@ export default function CyberNodeMap() {
         const bh = PAGE_ROWS * CELL;
 
         let col = COL_DEFAULT_SUBNET;
-        if (owners[pi] === 'P1') col = COL_P1_SUBNET;
+        if (owners[pi] && currentPlayer && owners[pi] === currentPlayer) col = COL_P1_SUBNET;
         else if (owners[pi]) col = COL_P2_SUBNET;
 
         // Subtle fill
@@ -249,8 +270,8 @@ export default function CyberNodeMap() {
         fontSize: 28,
         fontWeight: '700',
         fill: 0xffffff,
-        alpha: 0.25,
       });
+      label.alpha = 0.25;
 
       // Position near the top corner of the subnet cell (in flat space)
       label.x = x0 + 15;
@@ -267,15 +288,8 @@ export default function CyberNodeMap() {
 
 
 
-    // Ticker for updating buildings and uncollected data visually
-    let lastTick = 0;
+    // Ticker for updating buildings visually
     app.ticker.add(() => {
-      lastTick += app.ticker.deltaMS;
-      if (lastTick >= 1000) {
-        lastTick = 0;
-        useGameStore.getState().tickMiners();
-      }
-
       const mapData = useGameStore.getState().mapData;
       
       // Update subnet dynamic colors
@@ -318,10 +332,10 @@ export default function CyberNodeMap() {
             spriteImg = PIXI.Sprite.from('/firewall.png');
             textUpOffset = 70;
           } else if (node.buildingType === 3) {
-            spriteImg = PIXI.Sprite.from('/mainframe.png');
+            spriteImg = PIXI.Sprite.from('/dataCent.png');
             textUpOffset = 70;
           } else if (node.buildingType === 4) {
-            spriteImg = PIXI.Sprite.from('/dataCent.png');
+            spriteImg = PIXI.Sprite.from('/mainframe.png');
             textUpOffset = 70;
           }
 
@@ -447,6 +461,7 @@ export default function CyberNodeMap() {
 
     // Camera bounds clamping
     function clampCamera() {
+      if (!el) return;
       const s = camera.scale.x;
       const iW = diagW * s;
       const iH = diagH * s;

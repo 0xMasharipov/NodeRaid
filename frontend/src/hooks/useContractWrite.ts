@@ -1,34 +1,14 @@
-/**
- * useContractWrite — CyberNodeWorld Yazma Hook'ları
- *
- * Oyundaki tüm on-chain aksiyonları (hack, build, massExtract, upgrade)
- * MetaMask TX onayı ile çalıştırır. Her yazma işlemi sonrası harita
- * verisini otomatik yeniler (refetch).
- *
- * Pattern:
- *   1. useWriteContract() → TX hash üretir
- *   2. useWaitForTransactionReceipt() → TX onayını bekler
- *   3. onSuccess callback → refetch ile haritayı günceller
- */
-
 'use client';
 
+import { useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { type Address } from 'viem';
 import {
-  CYBER_NODE_WORLD_ADDRESS,
-  CYBER_NODE_WORLD_ABI,
+  CYBER_NODE_GAME_ADDRESS,
+  CYBER_NODE_GAME_ABI,
 } from '../config/contracts';
+import { useMapData, usePlayerResources } from './useContractRead';
 
-/**
- * CyberNodeWorld kontratına yazma işlemlerini yöneten hook.
- * Tek bir hook ile tüm write fonksiyonlarına erişim sağlar.
- *
- * Kullanım:
- * ```tsx
- * const { hackNode, buildOnNode, extractResources, upgradeNode, isPending, isConfirming, isSuccess, hash } = useGameActions();
- * ```
- */
 export function useGameActions() {
   const {
     writeContract,
@@ -42,60 +22,94 @@ export function useGameActions() {
     hash,
   });
 
-  // ── hack(nodeId) ────────────────────────────────────────────────────
-  // Boş veya savunmasız bir düğümü ele geçir
+  const { refetch: refetchMap } = useMapData();
+  const { refetch: refetchResources } = usePlayerResources();
+
+  useEffect(() => {
+    if (isSuccess) {
+      refetchMap();
+      refetchResources();
+    }
+  }, [isSuccess, refetchMap, refetchResources]);
+
+  // ── initPlayer(nodeId) — Oyunu başlat, Mainframe kur ───────────────────
+  const initPlayer = (nodeId: number) => {
+    writeContract({
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
+      functionName: 'initPlayer',
+      args: [BigInt(nodeId)],
+      gas: BigInt(500_000),
+    });
+  };
+
+  // ── hack(nodeId) ────────────────────────────────────────────────────────
   const hackNode = (nodeId: number) => {
     writeContract({
-      address: CYBER_NODE_WORLD_ADDRESS as Address,
-      abi: CYBER_NODE_WORLD_ABI,
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
       functionName: 'hack',
       args: [BigInt(nodeId)],
+      gas: BigInt(200_000),
     });
   };
 
-  // ── build(nodeId, buildingType) ─────────────────────────────────────
-  // Sahip olduğun boş düğüme bina kur (1=Miner, 2=Firewall, 3=DataCenter)
+  // ── build(nodeId, buildingType) ─────────────────────────────────────────
   const buildOnNode = (nodeId: number, buildingType: number) => {
     writeContract({
-      address: CYBER_NODE_WORLD_ADDRESS as Address,
-      abi: CYBER_NODE_WORLD_ABI,
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
       functionName: 'build',
       args: [BigInt(nodeId), buildingType],
+      gas: BigInt(200_000),
     });
   };
 
-  // ── massExtract(subnetId) ───────────────────────────────────────────
-  // Bir subnet'teki tüm Miner/DataCenter'lardan kaynak topla
+  // ── massExtract(subnetId) ───────────────────────────────────────────────
   const extractResources = (subnetId: number) => {
     writeContract({
-      address: CYBER_NODE_WORLD_ADDRESS as Address,
-      abi: CYBER_NODE_WORLD_ABI,
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
       functionName: 'massExtract',
       args: [BigInt(subnetId)],
+      gas: BigInt(5_000_000),
     });
   };
 
-  // ── upgrade(nodeId) ─────────────────────────────────────────────────
-  // Mevcut binayı bir seviye yükselt (max level: 10)
+  // ── upgrade(nodeId) ─────────────────────────────────────────────────────
   const upgradeNode = (nodeId: number) => {
     writeContract({
-      address: CYBER_NODE_WORLD_ADDRESS as Address,
-      abi: CYBER_NODE_WORLD_ABI,
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
       functionName: 'upgrade',
       args: [BigInt(nodeId)],
+      gas: BigInt(200_000),
+    });
+  };
+
+  // ── destroyFirewall(nodeId) — Hack aşama 1 ─────────────────────────────
+  const destroyFirewall = (nodeId: number) => {
+    writeContract({
+      address: CYBER_NODE_GAME_ADDRESS as Address,
+      abi: CYBER_NODE_GAME_ABI,
+      functionName: 'destroyFirewall',
+      args: [BigInt(nodeId)],
+      gas: BigInt(200_000),
     });
   };
 
   return {
+    initPlayer,
     hackNode,
     buildOnNode,
     extractResources,
     upgradeNode,
+    destroyFirewall,
     hash,
-    isPending,      // TX MetaMask'ta onay bekliyor
-    isConfirming,   // TX blockchain'de confirm ediliyor
-    isSuccess,      // TX başarıyla tamamlandı
-    writeError,     // Hata oluştuysa
-    reset,          // State'i sıfırla (yeni TX için)
+    isPending,
+    isConfirming,
+    isSuccess,
+    writeError,
+    reset,
   };
 }

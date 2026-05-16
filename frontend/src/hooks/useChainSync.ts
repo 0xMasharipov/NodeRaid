@@ -53,11 +53,9 @@ export function useChainSync() {
 
   // On-chain kaynakları Zustand'a aktar
   useEffect(() => {
-    if (onChainResources !== undefined && onChainResources > 0) {
-      // globalResources'u on-chain değeriyle senkronize et
+    if (onChainResources !== undefined) {
       const currentResources = useGameStore.getState().globalResources;
       if (currentResources !== onChainResources) {
-        // Farkı hesapla ve güncelle (addGlobalResource yerine doğrudan set)
         useGameStore.setState({ globalResources: onChainResources });
       }
     }

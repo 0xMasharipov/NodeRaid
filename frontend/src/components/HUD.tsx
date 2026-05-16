@@ -8,6 +8,8 @@ import HackTerminalModal from './HackTerminalModal';
 
 import { useGameStore } from '../store/gameStore';
 import { useGameActions } from '../hooks/useContractWrite';
+import { usePlayerInitialized } from '../hooks/useContractRead';
+import { COST_MINER, COST_FIREWALL, COST_DATACENTER } from '../config/contracts';
 
 const leaderboard = [
   { rank: 1, player: 'P1', page: 3, bonus: '+5% Data' },
@@ -22,14 +24,21 @@ export default function HUD() {
 
   // On-chain yazma aksiyonları
   const {
+    initPlayer,
     hackNode,
     buildOnNode,
     extractResources,
     upgradeNode,
+    destroyFirewall,
     isPending: isTxPending,
     isConfirming: isTxConfirming,
     isSuccess: isTxSuccess,
+    writeError,
+    reset: resetTx,
   } = useGameActions();
+
+  // Oyuncu başlatılmış mı?
+  const { isInitialized } = usePlayerInitialized();
 
   useEffect(() => {
     setMounted(true);
@@ -132,26 +141,72 @@ export default function HUD() {
                 <div style={{ color: '#00e5ff', fontSize: '14px', marginBottom: '8px', fontFamily: 'Orbitron, sans-serif' }}>
                   Status: UNCLAIMED
                 </div>
-                <div style={{ color: '#94a3b8', fontSize: '11px', fontFamily: 'monospace', marginBottom: '4px' }}>
-                  Bu node henüz kimseye ait değil. Sahiplen!
-                </div>
-                <button
-                  className={styles.cmdBtn}
-                  disabled={isTxPending || isTxConfirming || !address}
-                  style={{
-                    borderColor: '#a855f7',
-                    color: '#a855f7',
-                    textShadow: '0 0 8px rgba(168,85,247,0.6)',
-                    opacity: (!address || isTxPending || isTxConfirming) ? 0.5 : 1,
-                  }}
-                  onClick={() => hackNode(selectedNode.id)}
-                >
-                  {isTxPending ? '⏳ ONAY BEKLENİYOR...' : isTxConfirming ? '⛓ İŞLENİYOR...' : '◈ HACK — SAHİPLEN'}
-                </button>
-                {!address && (
+
+                {!address ? (
                   <div style={{ color: '#ef4444', fontSize: '10px', fontFamily: 'monospace' }}>
                     Önce cüzdanını bağla!
                   </div>
+                ) : !isInitialized ? (
+                  <>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', fontFamily: 'monospace', marginBottom: '4px' }}>
+                      Oyuna başla! Bu node'a Mainframe kurulacak. (500 DATA harcanır, 500 DATA kalır)
+                    </div>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{
+                        borderColor: '#fbbf24',
+                        color: '#fbbf24',
+                        textShadow: '0 0 8px rgba(251,191,36,0.6)',
+                        opacity: (isTxPending || isTxConfirming) ? 0.5 : 1,
+                      }}
+                      onClick={() => initPlayer(selectedNode.id)}
+                    >
+                      {isTxPending ? '⏳ ONAY BEKLENİYOR...' : isTxConfirming ? '⛓ İŞLENİYOR...' : '⬡ OYUNU BAŞLAT — MAINFRAME KUR'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', fontFamily: 'monospace', marginBottom: '4px' }}>
+                      Bu node boş. Bina kur veya sahiplen!
+                    </div>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{
+                        borderColor: '#4ade80',
+                        color: '#4ade80',
+                        opacity: (isTxPending || isTxConfirming) ? 0.5 : 1,
+                      }}
+                      onClick={() => buildOnNode(selectedNode.id, 1)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD MINER (${COST_MINER} DATA)`}
+                    </button>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{
+                        borderColor: '#38bdf8',
+                        color: '#38bdf8',
+                        opacity: (isTxPending || isTxConfirming) ? 0.5 : 1,
+                      }}
+                      onClick={() => buildOnNode(selectedNode.id, 2)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD FIREWALL (${COST_FIREWALL} DATA)`}
+                    </button>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{
+                        borderColor: '#a855f7',
+                        color: '#a855f7',
+                        opacity: (isTxPending || isTxConfirming) ? 0.5 : 1,
+                      }}
+                      onClick={() => buildOnNode(selectedNode.id, 3)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD DATACENTER (${COST_DATACENTER} DATA)`}
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -164,30 +219,38 @@ export default function HUD() {
                 <div style={{ color: '#94a3b8', fontSize: '11px', fontFamily: 'monospace', marginBottom: '4px' }}>
                   Owner: {selectedNode.username || 'You'}
                 </div>
-                <button
-                  className={styles.cmdBtn}
-                  disabled={isTxPending || isTxConfirming}
-                  style={{ opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
-                  onClick={() => buildOnNode(selectedNode.id, 1)}
-                >
-                  {isTxPending ? '⏳ ONAY...' : 'BUILD MINER'}
-                </button>
-                <button
-                  className={styles.cmdBtn}
-                  disabled={isTxPending || isTxConfirming}
-                  style={{ opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
-                  onClick={() => buildOnNode(selectedNode.id, 2)}
-                >
-                  BUILD FIREWALL
-                </button>
-                <button
-                  className={styles.cmdBtn}
-                  disabled={isTxPending || isTxConfirming}
-                  style={{ opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
-                  onClick={() => buildOnNode(selectedNode.id, 3)}
-                >
-                  BUILD DATACENTER
-                </button>
+                {!isInitialized ? (
+                  <div style={{ color: '#fbbf24', fontSize: '11px', fontFamily: 'monospace' }}>
+                    Önce oyunu başlat! Boş bir node&apos;a tıklayıp &quot;OYUNU BAŞLAT&quot; butonuna bas.
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{ borderColor: '#4ade80', color: '#4ade80', opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
+                      onClick={() => buildOnNode(selectedNode.id, 1)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD MINER (${COST_MINER} DATA)`}
+                    </button>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{ borderColor: '#38bdf8', color: '#38bdf8', opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
+                      onClick={() => buildOnNode(selectedNode.id, 2)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD FIREWALL (${COST_FIREWALL} DATA)`}
+                    </button>
+                    <button
+                      className={styles.cmdBtn}
+                      disabled={isTxPending || isTxConfirming}
+                      style={{ borderColor: '#a855f7', color: '#a855f7', opacity: (isTxPending || isTxConfirming) ? 0.5 : 1 }}
+                      onClick={() => buildOnNode(selectedNode.id, 3)}
+                    >
+                      {isTxPending ? '⏳...' : `BUILD DATACENTER (${COST_DATACENTER} DATA)`}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
@@ -350,8 +413,24 @@ export default function HUD() {
                   </button>
                 )}
 
-                {/* Hack butonu (sadece düşman binalarda) */}
-                {isEnemyBuilding && (
+                {/* Hack butonu — düşman Firewall'a: destroyFirewall, diğer düşman node'lara: hack */}
+                {isEnemyBuilding && selectedNode.buildingType === 2 && (
+                  <button
+                    className={styles.cmdBtn}
+                    disabled={isTxPending || isTxConfirming}
+                    style={{
+                      marginTop: '16px',
+                      borderColor: '#ef4444',
+                      color: '#ef4444',
+                      textShadow: '0 0 8px rgba(239,68,68,0.6)',
+                      opacity: (isTxPending || isTxConfirming) ? 0.5 : 1,
+                    }}
+                    onClick={() => setIsHackOpen(true)}
+                  >
+                    {isTxPending ? '⏳ ONAY...' : '◈ DESTROY FIREWALL'}
+                  </button>
+                )}
+                {isEnemyBuilding && selectedNode.buildingType !== 2 && selectedNode.buildingType !== 4 && (
                   <button
                     className={styles.cmdBtn}
                     disabled={isTxPending || isTxConfirming}
@@ -364,7 +443,7 @@ export default function HUD() {
                     }}
                     onClick={() => setIsHackOpen(true)}
                   >
-                    {isTxPending ? '⏳ ONAY...' : '◈ HACK'}
+                    {isTxPending ? '⏳ ONAY...' : '◈ HACK NODE'}
                   </button>
                 )}
 
@@ -391,7 +470,7 @@ export default function HUD() {
       </div>
 
       {/* ── TX Durum Göstergesi ── */}
-      {(isTxPending || isTxConfirming || isTxSuccess) && (
+      {(isTxPending || isTxConfirming || isTxSuccess || writeError) && (
         <div style={{
           position: 'fixed',
           bottom: '20px',
@@ -404,15 +483,21 @@ export default function HUD() {
           fontWeight: 'bold',
           zIndex: 9999,
           border: '1px solid',
-          borderColor: isTxSuccess ? '#4ade80' : '#a855f7',
-          background: isTxSuccess ? 'rgba(74, 222, 128, 0.15)' : 'rgba(168, 85, 247, 0.15)',
-          color: isTxSuccess ? '#4ade80' : '#a855f7',
+          borderColor: writeError ? '#ef4444' : isTxSuccess ? '#4ade80' : '#a855f7',
+          background: writeError ? 'rgba(239, 68, 68, 0.15)' : isTxSuccess ? 'rgba(74, 222, 128, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+          color: writeError ? '#ef4444' : isTxSuccess ? '#4ade80' : '#a855f7',
           backdropFilter: 'blur(8px)',
-          textShadow: isTxSuccess ? '0 0 8px #4ade80' : '0 0 8px #a855f7',
-        }}>
+          textShadow: writeError ? '0 0 8px #ef4444' : isTxSuccess ? '0 0 8px #4ade80' : '0 0 8px #a855f7',
+          cursor: writeError || isTxSuccess ? 'pointer' : 'default',
+          maxWidth: '500px',
+          textAlign: 'center',
+        }}
+          onClick={() => { if (writeError || isTxSuccess) resetTx(); }}
+        >
           {isTxPending && '⏳ MetaMask\'ta işlemi onayla...'}
           {isTxConfirming && '⛓ İşlem blockchain\'de onaylanıyor...'}
-          {isTxSuccess && '✅ İşlem başarılı!'}
+          {isTxSuccess && '✅ İşlem başarılı! (kapat)'}
+          {writeError && `❌ TX Hatası: ${writeError.message?.slice(0, 80)} (kapat)`}
         </div>
       )}
 
@@ -424,8 +509,13 @@ export default function HUD() {
         onSuccess={() => {
           setIsHackOpen(false);
           if (selectedNode) {
-            // On-chain hack çağrısı — MetaMask açılır
-            hackNode(selectedNode.id);
+            if (selectedNode.buildingType === 2) {
+              // Firewall yıkma (Hack aşama 1)
+              destroyFirewall(selectedNode.id);
+            } else {
+              // Normal hack (savunmasız node ele geçirme)
+              hackNode(selectedNode.id);
+            }
           }
         }}
       />

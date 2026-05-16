@@ -72,15 +72,14 @@ export const useGameStore = create<GameState>((set) => ({
 
   collectData: () =>
     set((state) => {
+      if (!state.currentPlayer) return state;
+      const myAddr = state.currentPlayer.toLowerCase();
       const now = Date.now();
       let totalDataToCollect = 0;
 
       const updatedMapData = state.mapData.map((node) => {
-        // P1'e ait olan tüm Miner'lardan (Type 1) data topla
-        if (node.buildingType === 1 && node.owner === 'P1') {
-          const timeDiffSeconds = Math.floor((now - node.lastHarvestTime) / 1000);
-          const dataToCollect = timeDiffSeconds * (node.level * 10);
-
+        if (node.buildingType === 1 && node.owner && node.owner.toLowerCase() === myAddr) {
+          const dataToCollect = node.uncollectedData;
           if (dataToCollect > 0) {
             totalDataToCollect += dataToCollect;
             return { ...node, lastHarvestTime: now, uncollectedData: 0 };
@@ -106,34 +105,18 @@ export const useGameStore = create<GameState>((set) => ({
 
   addGlobalResource: (amount) => set((state) => ({ globalResources: state.globalResources + amount })),
 
-  tickMiners: () =>
-    set((state) => {
-      const now = Date.now();
-      let hasChanges = false;
-      const updatedMapData = state.mapData.map((node) => {
-        if (node.buildingType === 1) { // Miner
-          const timeDiffSeconds = Math.floor((now - node.lastHarvestTime) / 1000);
-          const uncollectedData = timeDiffSeconds * (node.level * 10);
-          if (node.uncollectedData !== uncollectedData) {
-            hasChanges = true;
-            return { ...node, uncollectedData };
-          }
-        }
-        return node;
-      });
-      return hasChanges ? { mapData: updatedMapData } : state;
-    }),
+  tickMiners: () => set((state) => state),
 
-  buildNode: (id, buildingType, cost) =>
+  buildNode: (id, buildingType, _cost) =>
     set((state) => {
-      if (state.globalResources < cost) return state;
+      if (!state.currentPlayer) return state;
 
       const updatedMapData = state.mapData.map((node) => {
         if (node.id === id && node.buildingType === 0) {
           return {
             ...node,
-            owner: 'P1',
-            username: 'P1_Hacker',
+            owner: state.currentPlayer,
+            username: `${state.currentPlayer!.slice(0, 6)}...${state.currentPlayer!.slice(-4)}`,
             buildingType,
             level: 1,
             lastHarvestTime: Date.now(),
@@ -143,16 +126,15 @@ export const useGameStore = create<GameState>((set) => ({
         return node;
       });
 
-      return {
-        mapData: updatedMapData,
-        globalResources: state.globalResources - cost,
-      };
+      return { mapData: updatedMapData };
     }),
 
   destroyNode: (id) =>
     set((state) => {
+      if (!state.currentPlayer) return state;
+      const myAddr = state.currentPlayer.toLowerCase();
       const node = state.mapData.find((n) => n.id === id);
-      if (!node || node.owner !== 'P1' || node.buildingType === 0) return state;
+      if (!node || !node.owner || node.owner.toLowerCase() !== myAddr || node.buildingType === 0) return state;
 
       const updatedMapData = state.mapData.map((n) =>
         n.id === id

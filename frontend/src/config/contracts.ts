@@ -1,21 +1,41 @@
 /**
- * CyberNodeWorld Kontrat Yapılandırması
- * 
- * Monad Testnet üzerinde deploy edilmiş CyberNodeWorld kontratının
- * adresi ve ABI tanımları. Frontend hook'ları bu config'i kullanır.
+ * CyberNodeGame Kontrat Yapılandırması
+ *
+ * Deploy edildikten sonra CYBER_NODE_GAME_ADDRESS güncellenmeli!
  */
 
-// ── Kontrat Adresi ──────────────────────────────────────────────────────
-export const CYBER_NODE_WORLD_ADDRESS = '0xA93CF34Eec6DE68D5C88c7E89b87059CEAe9c79F' as const;
+// ── Kontrat Adresi (deploy sonrası güncelle!) ───────────────────────────
+export const CYBER_NODE_GAME_ADDRESS = '0x81f7D4dba4028Ae8AC80D2b37544966a41F4e07E' as const;
 
-// ── Kontrat ABI (Sadece kullanılan fonksiyonlar) ────────────────────────
-// Foundry'nin ürettiği dev ABI yerine, sadece ihtiyacımız olan view/write
-// fonksiyonlarını "human-readable" formatta tutuyoruz. Bu yaklaşım:
-//   1. Bundle boyutunu küçültür (55KB JSON vs ~2KB)
-//   2. Tip güvenliğini korur (Viem otomatik tip çıkarımı yapar)
-//   3. Okunabilirliği artırır
-export const CYBER_NODE_WORLD_ABI = [
-  // ── View Functions (Okuma) ──────────────────────────────────────────
+// Eski adres referansı (geriye uyumluluk için)
+export const CYBER_NODE_WORLD_ADDRESS = CYBER_NODE_GAME_ADDRESS;
+
+// ── Kontrat ABI ─────────────────────────────────────────────────────────
+export const CYBER_NODE_GAME_ABI = [
+  // ── Player Init ────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    name: 'initPlayer',
+    inputs: [{ name: 'nodeId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'isPlayerInitialized',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getPlayerMainframe',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+
+  // ── View Functions ─────────────────────────────────────────────────────
   {
     type: 'function',
     name: 'getNode',
@@ -62,7 +82,7 @@ export const CYBER_NODE_WORLD_ABI = [
     stateMutability: 'view',
   },
 
-  // ── Write Functions (Yazma — TX gerektirir) ─────────────────────────
+  // ── Write Functions ────────────────────────────────────────────────────
   {
     type: 'function',
     name: 'hack',
@@ -94,8 +114,24 @@ export const CYBER_NODE_WORLD_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'destroyFirewall',
+    inputs: [{ name: 'nodeId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
 
-  // ── Events ──────────────────────────────────────────────────────────
+  // ── Events ─────────────────────────────────────────────────────────────
+  {
+    type: 'event',
+    name: 'PlayerInitialized',
+    inputs: [
+      { name: 'player', type: 'address', indexed: true },
+      { name: 'mainframeNodeId', type: 'uint256', indexed: false },
+      { name: 'subnetId', type: 'uint256', indexed: false },
+    ],
+  },
   {
     type: 'event',
     name: 'NodeHacked',
@@ -130,8 +166,26 @@ export const CYBER_NODE_WORLD_ABI = [
       { name: 'newLevel', type: 'uint8', indexed: false },
     ],
   },
+  {
+    type: 'event',
+    name: 'FirewallDestroyed',
+    inputs: [
+      { name: 'nodeId', type: 'uint256', indexed: true },
+      { name: 'attacker', type: 'address', indexed: true },
+    ],
+  },
 
-  // ── Errors ──────────────────────────────────────────────────────────
+  // ── Errors ─────────────────────────────────────────────────────────────
+  {
+    type: 'error',
+    name: 'AlreadyInitialized',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotInitialized',
+    inputs: [],
+  },
   {
     type: 'error',
     name: 'InvalidNodeId',
@@ -168,11 +222,8 @@ export const CYBER_NODE_WORLD_ABI = [
   },
   {
     type: 'error',
-    name: 'HackDefended',
-    inputs: [
-      { name: 'nodeId', type: 'uint256' },
-      { name: 'defensePower', type: 'uint8' },
-    ],
+    name: 'InvalidSubnetId',
+    inputs: [{ name: 'subnetId', type: 'uint256' }],
   },
   {
     type: 'error',
@@ -182,18 +233,65 @@ export const CYBER_NODE_WORLD_ABI = [
       { name: 'currentLevel', type: 'uint8' },
     ],
   },
+  {
+    type: 'error',
+    name: 'HackDefended',
+    inputs: [
+      { name: 'nodeId', type: 'uint256' },
+      { name: 'defensePower', type: 'uint8' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientResources',
+    inputs: [
+      { name: 'required', type: 'uint256' },
+      { name: 'available', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotInYourSubnet',
+    inputs: [
+      { name: 'nodeId', type: 'uint256' },
+      { name: 'yourSubnet', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotAFirewall',
+    inputs: [
+      { name: 'nodeId', type: 'uint256' },
+      { name: 'actualType', type: 'uint8' },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'CannotHackMainframe',
+    inputs: [{ name: 'nodeId', type: 'uint256' }],
+  },
 ] as const;
 
-// ── Sabitler ──────────────────────────────────────────────────────────
+// Eski referans (geriye uyumluluk)
+export const CYBER_NODE_WORLD_ABI = CYBER_NODE_GAME_ABI;
+
+// ── Sabitler ─────────────────────────────────────────────────────────────
 export const TOTAL_SUBNETS = 8;
 export const NODES_PER_SUBNET = 128;
 export const MAX_NODES = 1024;
 
-// ── Bina Tipi Sabitleri ───────────────────────────────────────────────
+// ── Bina Tipi Sabitleri ──────────────────────────────────────────────────
 export const BUILDING_NONE = 0;
 export const BUILDING_MINER = 1;
 export const BUILDING_FIREWALL = 2;
 export const BUILDING_DATACENTER = 3;
+export const BUILDING_MAINFRAME = 4;
+
+// ── Bina Maliyetleri ─────────────────────────────────────────────────────
+export const COST_MAINFRAME = 500;
+export const COST_MINER = 200;
+export const COST_FIREWALL = 300;
+export const COST_DATACENTER = 400;
 
 // Bina tipi etiketleri
 export const BUILDING_LABELS: Record<number, string> = {

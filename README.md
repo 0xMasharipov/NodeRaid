@@ -1,12 +1,8 @@
 # NodeRaid
 
-<!--
-Banner placeholder:
-Example:
 <p align="center">
-  <img src="./assets/banner/noderaid-banner.png" alt="NodeRaid Banner" width="100%" />
+  <img src="./assets/banners/NodeRaid_Banner.png" alt="NodeRaid_Banner.png" width="100%" />
 </p>
--->
 
 <p align="center">
   <strong>Build your node. Fortify your network. Raid rival systems.</strong>
